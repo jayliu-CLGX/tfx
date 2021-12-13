@@ -8,6 +8,33 @@
 
 ### For Pipeline Authors
 
+#### Possible breaking change on using `Cond`.
+
+Audience:
+*   If you define and run only one `Pipeline` instance when running your
+    `pipeline.py`, you can stop reading this.
+*   If you don't use `Cond`, you can stop reading this.
+
+There was a change in the way TFX collects the context manager style DSL
+elements (such as `experimental.conditionals.Cond`). DSL context manager
+definitions are automatically collected to a global registry. This global
+registry is persisted locally and passed to the `Pipeline` object right before
+compiling the `Pipeline`. If your `pipeline.py` has multiple `Pipeline`
+instances and pipeline definitions are interleaved, `Cond` may be only
+reconigzed from the first pipeline but not in the second.
+
+We don't mark this as a breaking public API change because `Cond` is an
+experimental API that can change within the same major version, and the
+illustrated use case is quite unusual. But if you belong to this breaking
+change, here's the instruction to take:
+
+1.  Mostly encouraged, you can split your pipeline definitions into multiple
+    `pipeline.py` files and run each DSL python script one at a time.
+2.  If you have to instantiate and run multiple pipelines in a single python
+    program, make sure you compile the first pipeline before defining any part
+    of the second pipeline. (We're coming with a better syntax to enforce this
+    behavior, which will be a bigger change.)
+
 ### For Component Authors
 
 ## Deprecations
