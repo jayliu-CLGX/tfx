@@ -14,6 +14,7 @@
 """TaskGenerator implementation for sync pipelines."""
 
 import collections
+import time
 import typing
 from typing import Callable, Dict, List, Mapping, Optional, Set
 
@@ -310,12 +311,17 @@ class _Generator:
     # TODO(b/207038460): Update sync pipeline to support ForEach.
     input_artifacts = resolved_info.input_artifacts[0]
 
+    execution_name = '-'.join([
+        self._pipeline.pipeline_info.id, node.node_info.id,
+        str(int(time.time() * 1000))
+    ])
     execution = execution_publish_utils.register_execution(
         metadata_handler=self._mlmd_handle,
         execution_type=node.node_info.type,
         contexts=resolved_info.contexts,
         input_artifacts=input_artifacts,
-        exec_properties=resolved_info.exec_properties)
+        exec_properties=resolved_info.exec_properties,
+        exec_name=execution_name)
     outputs_resolver = outputs_utils.OutputsResolver(
         node, self._pipeline.pipeline_info, self._pipeline.runtime_spec,
         self._pipeline.execution_mode)

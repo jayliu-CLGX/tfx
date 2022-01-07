@@ -14,6 +14,7 @@
 """Portable library for registering and publishing executions."""
 import copy
 import os
+import time
 from typing import Mapping, Optional, Sequence
 from absl import logging
 
@@ -22,6 +23,7 @@ from tfx.orchestration import metadata
 from tfx.orchestration.portable.mlmd import execution_lib
 from tfx.proto.orchestration import execution_result_pb2
 from tfx.utils import typing_utils
+import ml_metadata as mlmd
 
 from ml_metadata.proto import metadata_store_pb2
 
@@ -237,7 +239,7 @@ def register_execution(
     contexts: Sequence[metadata_store_pb2.Context],
     input_artifacts: Optional[typing_utils.ArtifactMultiMap] = None,
     exec_properties: Optional[Mapping[str, types.ExecPropertyTypes]] = None,
-) -> metadata_store_pb2.Execution:
+    exec_name: str = '') -> metadata_store_pb2.Execution:
   """Registers a new execution in MLMD.
 
   Along with the execution:
@@ -251,12 +253,27 @@ def register_execution(
     input_artifacts: Input artifacts of the execution. Each artifact will be
       linked with the execution through an event.
     exec_properties: Execution properties. Will be attached to the execution.
+    exec_name: Name of the execution. If it is not provided, timestamp(ms) will
+      be used as a name, so that register execution is idempotent against
+      retries.
 
   Returns:
     An MLMD execution that is registered in MLMD, with id populated.
   """
+  if not exec_name:
+    exec_name = str(int(time.time() * 1000))
   execution = execution_lib.prepare_execution(
-      metadata_handler, execution_type, metadata_store_pb2.Execution.RUNNING,
-      exec_properties)
-  return execution_lib.put_execution(
-      metadata_handler, execution, contexts, input_artifacts=input_artifacts)
+      metadata_handler,
+      execution_type,
+      metadata_store_pb2.Execution.RUNNING,
+      exec_properties,
+      execution_name=exec_name)
+
+  try:
+    execution = execution_lib.put_execution(
+        metadata_handler, execution, contexts, input_artifacts=input_artifacts)
+  except mlmd.errors.AlreadyExistsError:
+    return metadata_handler.store.get_execution_by_type_and_name(
+        type_name=execution_type.name, execution_name=exec_name)
+
+  return execution
